@@ -50,8 +50,8 @@ int main(int argc, char* argv[])
 		fputs("输入信息：", stdout);
 		fgets(message, BUF_SIZE, stdin);
 		
-		send(sock, message, strlen(message), 0);
-		int recvLen = recv(sock, message, BUF_SIZE - 1, 0);
+		send(sock, message, strlen(message), MSG_WAITALL);
+		int recvLen = recv(sock, message, BUF_SIZE - 1, MSG_WAITALL);
 		message[recvLen] = '\0';
 		if (recvLen == 0) break;
 		printf("收到服务端消息：%s", message);
