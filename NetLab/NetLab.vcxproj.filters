@@ -21,6 +21,12 @@
     <ClCompile Include="Lab3\protocol_header.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Lab2\iocp_server.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Lab2\echo_client.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Lab3\protocol_header.h">
