@@ -13,11 +13,6 @@ char message[BUF_SIZE];
 
 int main(int argc, char* argv[])
 {
-	if (argc != 3)
-	{
-		printf("Usage: %s <IP> <Port>\n", argv[0]);
-		exit(1);
-	}
 
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
@@ -37,8 +32,8 @@ int main(int argc, char* argv[])
 	SOCKADDR_IN servAddr;
 	memset(&servAddr, 0, sizeof(SOCKADDR_IN));
 	servAddr.sin_family = AF_INET;
-	servAddr.sin_addr.s_addr = inet_addr(argv[1]);
-	servAddr.sin_port = htons(atoi(argv[2]));
+	servAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	servAddr.sin_port = htons(8888);
 
 	if (connect(sock, (SOCKADDR*)&servAddr, sizeof(servAddr)) == -1) {
 		std::cerr << "连接服务器失败。\n";

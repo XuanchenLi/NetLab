@@ -15,16 +15,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Lab3\main.cpp">
+    <ClCompile Include="Lab2_client\echo_client.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Lab3\protocol_header.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Lab3\protocol_header.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

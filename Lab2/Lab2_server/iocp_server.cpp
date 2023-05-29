@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
 	memset(&servAddr, 0, sizeof(servAddr));
 	servAddr.sin_family = AF_INET;
 	servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	servAddr.sin_port = htons(atoi(argv[1]));
+	servAddr.sin_port = htons(8888);
 
 	bind(hServSock, (SOCKADDR*)&servAddr, sizeof(servAddr));
 	listen(hServSock, 5);

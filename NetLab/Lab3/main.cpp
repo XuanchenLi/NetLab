@@ -75,11 +75,17 @@ int main(int argc, char *argv[])
 		if (dataSize > 0)
 		{
 			ipHdr = *(IPHeader*)buffer;
-			std::cout << "----------------------------------------IP首部：\n" << ipHdr;
 			if (ipHdr.protocol == IPPROTO_TCP)
 			{
 				tcpHdr = *(TCPHeader*)(buffer + ipHdr.ihl * 4);
 			}
+			else
+			{
+				continue;
+			}
+			if (strcmp(inet_ntoa(*(struct in_addr*)&ipHdr.daddr), "127.0.0.1") != 0 || ntohs(tcpHdr.sport) != 8888)
+				continue;
+			std::cout << "----------------------------------------IP首部：\n" << ipHdr;
 			std::cout << "----------------------------------------TCP首部：\n" << tcpHdr;
 			char* dataPtr = buffer + (ipHdr.ihl * 4) + (tcpHdr.thl * 4);
 			int dataLen = dataSize - (ipHdr.ihl * 4) - (tcpHdr.thl * 4);
