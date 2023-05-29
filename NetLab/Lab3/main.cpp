@@ -83,7 +83,8 @@ int main(int argc, char *argv[])
 			{
 				continue;
 			}
-			if (strcmp(inet_ntoa(*(struct in_addr*)&ipHdr.daddr), "127.0.0.1") != 0 || ntohs(tcpHdr.sport) != 8888)
+			if ((strcmp(inet_ntoa(*(struct in_addr*)&ipHdr.daddr), "127.0.0.1") != 0 ) && (strcmp(inet_ntoa(*(struct in_addr*)&ipHdr.saddr), "127.0.0.1") != 0)
+				|| (ntohs(tcpHdr.sport) != 8888 && ntohs(tcpHdr.dport) != 8888))
 				continue;
 			std::cout << "----------------------------------------IP首部：\n" << ipHdr;
 			std::cout << "----------------------------------------TCP首部：\n" << tcpHdr;

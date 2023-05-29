@@ -26,8 +26,8 @@ std::ostream& operator<<(std::ostream& os, const IPHeader& ipHdr)
 
 std::ostream& operator<<(std::ostream& os, const TCPHeader& tcpHdr)
 {
-	os << "Source port: " << tcpHdr.sport << std::endl;
-	os << "Destination port: " << tcpHdr.dport << std::endl;
+	os << "Source port: " << ntohs(tcpHdr.sport) << std::endl;
+	os << "Destination port: " << ntohs(tcpHdr.dport) << std::endl;
 	os << "Sequence: " << tcpHdr.seq << std::endl;
 	os << "Ack Sequence: " << tcpHdr.ack_seq << std::endl;
 	os << "Header Length: " << tcpHdr.thl * 4 << " bytes\n";

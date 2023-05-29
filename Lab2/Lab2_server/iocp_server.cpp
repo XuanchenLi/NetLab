@@ -109,6 +109,8 @@ DWORD32 WINAPI EchoThreadMain(LPVOID comPort_)
 			memset(&(ioInfo->overlapped), 0, sizeof(OVERLAPPED));
 			ioInfo->wsaBuf.len = bytesTrans;
 			ioInfo->rwMode = RW_MODE::WRITE;
+			ioInfo->wsaBuf.buf[ioInfo->wsaBuf.len] = '\0';
+			printf("收到客户端[%s:%d]的信息：%s", inet_ntoa(*((in_addr*)&(handleInfo->clntAddr.sin_addr))), ntohs(handleInfo->clntAddr.sin_port), ioInfo->wsaBuf.buf);
 			WSASend(clntSock, &(ioInfo->wsaBuf), 1, NULL, 0, &(ioInfo->overlapped), NULL);
 			
 			ioInfo = (IOData*)malloc(sizeof(IOData));
