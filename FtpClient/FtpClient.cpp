@@ -1,10 +1,270 @@
-ï»¿// FtpClient.cpp : æ­¤æ–‡ä»¶åŒ…å« "main" å‡½æ•°ã€‚ç¨‹åºæ‰§è¡Œå°†åœ¨æ­¤å¤„å¼€å§‹å¹¶ç»“æŸã€‚
-//
-
+#include <stdio.h>
+#include <stdlib.h>
 #include <iostream>
+#include <sstream>
+#include <WinSock2.h>
+#include <Windows.h>
+#include <process.h>
+#include <io.h>
+#include <filesystem>
+#include <fstream>
+#include "FTPClient.h"
 
-int main()
+
+FTPClient::FTPClient(std::string dir, std::string servIP, u_short servPort)
 {
-    std::cout << "Hello World!\n";
+
+	buffer = new char[BUF_SIZE];
+
+	this->dic = dir;
+	memset(&servAddr, 0, sizeof(SOCKADDR_IN));
+	servAddr.sin_family = AF_INET;
+	servAddr.sin_addr.s_addr = inet_addr(servIP.c_str());
+	servAddr.sin_port = htons(servPort);
+	WSADATA wsaData;
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+	{
+		throw std::exception("³õÊ¼»¯WSAÊ§°Ü");
+	}
+
+	clntSock = socket(PF_INET, SOCK_STREAM, 0);
+	if (clntSock == INVALID_SOCKET)
+	{
+		throw std::exception("³õÊ¼»¯Ì×½Ó×ÖÊ§°Ü");
+	}
+	int flag = 1;
+	int result = setsockopt(clntSock, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
+	if (result == SOCKET_ERROR)
+	{
+		throw std::exception("¹Ø±ÕNagleËã·¨Ê§°Ü");
+	}
+
+	if (connect(clntSock, (SOCKADDR*)&servAddr, sizeof(servAddr)) == -1)
+	{
+		throw std::exception("Á¬½Ó·şÎñÆ÷Ê§°Ü");
+	}
+
+	while (true)
+	{
+		printf("FTPClient>");
+		fgets(buffer, BUF_SIZE, stdin);
+
+		auto cmd = readCommand();
+		switch (cmd.first)
+		{
+		case::FTP_COMMAND::GET:
+			handleGet(dir + cmd.second);
+			break;
+		case::FTP_COMMAND::PUT:
+			handlePut(dir + cmd.second);
+			break;
+		case::FTP_COMMAND::LIST:
+			handleList();
+			break;
+		case::FTP_COMMAND::QUIT:
+			handleQuit();
+			break;
+		case::FTP_COMMAND::UNKNOWN:
+			handleUnknown();
+			break;
+		}
+
+	}
 }
 
+
+FTPClient::~FTPClient()
+{
+	delete[] buffer;
+	closesocket(clntSock);
+	WSACleanup();
+}
+
+std::pair<FTP_COMMAND, std::string> FTPClient::readCommand()
+{
+	std::stringstream is(buffer);
+	std::pair<FTP_COMMAND, std::string> res;
+	std::string sCmd;
+	is >> sCmd;
+	if (sCmd == "QUIT")
+	{
+		res.first = FTP_COMMAND::QUIT;
+	}
+	else if (sCmd == "GET")
+	{
+		res.first = FTP_COMMAND::GET;
+		is >> res.second;
+	}
+	else if (sCmd == "PUT")
+	{
+		res.first = FTP_COMMAND::PUT;
+		is >> res.second;
+	}
+	else if (sCmd == "LIST")
+	{
+		res.first = FTP_COMMAND::LIST;
+	}
+	else
+	{
+		res.first = FTP_COMMAND::UNKNOWN;
+	}
+	return res;
+}
+
+void FTPClient::transFile(std::string fName)
+{
+	std::ifstream input(fName.c_str(), std::ios::binary);
+	// ¼ì²éÎÄ¼şÊÇ·ñÕıÈ·´ò¿ª
+	if (!input)
+	{
+		sprintf(buffer, "0 ");
+		send(clntSock, buffer, strlen(buffer), 0);
+		throw std::exception("´ò¿ªÎÄ¼şÊ§°Ü");
+	}
+	// »ñÈ¡ÎÄ¼ş´óĞ¡
+	input.seekg(0, std::ios::end);
+	long long size = input.tellg();
+	input.seekg(0, std::ios::beg);
+	sprintf(buffer, "%lld ", size);
+	send(clntSock, buffer, strlen(buffer), 0);
+
+	for (int i = 0; i < int(ceil(size / (BUF_SIZE * 1.0))); ++i)
+	{
+		input.read(buffer, min(BUF_SIZE, size - i * BUF_SIZE));
+		send(clntSock, buffer, min(BUF_SIZE, size - i * BUF_SIZE), 0);
+	}
+	input.close();
+}
+
+void FTPClient::readFile(std::string fName)
+{
+	std::ofstream file(fName);
+	bool firstPack = true;
+	long long totalLen = 0;
+	int pos = 0;
+	while (true && file)
+	{
+		int recvBytes = recv(clntSock, buffer, BUF_SIZE - 1, 0);
+		buffer[recvBytes] = '\0';
+		if (firstPack)
+		{
+			while (pos < recvBytes && buffer[pos] != ' ') pos++;
+			pos++;
+			totalLen = atoll(buffer);
+			firstPack = false;
+		}
+		file.write(buffer + pos, recvBytes - pos);
+		totalLen -= recvBytes - pos;
+		if (!totalLen) break;
+		pos = 0;
+	}
+	if (!file)
+	{
+		throw std::exception("´´½¨ÎÄ¼şÊ§°Ü");
+	}
+	file.close();
+}
+
+bool FTPClient::isFileAvailable(std::string filename)
+{
+	std::filesystem::path fName(filename);
+	if (!std::filesystem::exists(fName))
+	{
+		throw std::exception("ÎÄ¼ş²»´æÔÚ");
+	}
+	if (std::filesystem::is_directory(fName))
+	{
+		throw std::exception("²»Ö§³Ö´«ÊäÎÄ¼ş¼Ğ");
+	}
+	if (std::filesystem::is_regular_file(fName) && std::filesystem::status_known(std::filesystem::status(fName)))
+	{
+		if ((std::filesystem::status(fName).permissions() & std::filesystem::perms::owner_read) != std::filesystem::perms::none)
+		{
+			return true;
+		}
+		else
+		{
+			throw std::exception("ÎÄ¼ş²»¿É¶Á");
+		}
+	}
+	else
+	{
+		throw std::exception("²»Ö§³ÖµÄÎÄ¼şÀàĞÍ");
+	}
+	return false;
+}
+
+void FTPClient::handleUnknown()
+{
+	send(clntSock, buffer, strlen(buffer) + 1, 0);
+	int recvBytes = recv(clntSock, buffer, BUF_SIZE - 1, 0);
+	buffer[recvBytes] = '\0';
+	puts(buffer);
+}
+
+void FTPClient::handleQuit()
+{
+	send(clntSock, buffer, strlen(buffer) + 1, 0);
+	puts("Bye~");
+}
+
+void FTPClient::handleList()
+{
+	send(clntSock, buffer, strlen(buffer) + 1, 0);
+	//puts(buffer);
+	int recvBytes = recv(clntSock, buffer, BUF_SIZE - 1, 0);
+	buffer[recvBytes] = '\0';
+	long long totLen = atoll(buffer);
+	int pos = 0;
+	while (buffer[pos] != ' ') pos++;
+	pos++;
+	std::string msg(buffer + pos);
+	totLen -= recvBytes - pos;
+	while (totLen)
+	{
+		recvBytes = recv(clntSock, buffer, BUF_SIZE - 1, 0);
+		buffer[recvBytes] = '\0';
+		msg += buffer;
+	}
+	puts(msg.c_str());
+}
+
+void FTPClient::handlePut(std::string fName)
+{
+	try
+	{
+		if (!isFileAvailable(fName))
+		{
+			throw std::exception("ÎÄ¼ş²»¿É´ï");
+		}
+		send(clntSock, buffer, strlen(buffer) + 1, 0);
+		transFile(fName);
+	}
+	catch (std::exception e)
+	{
+		puts(e.what());
+		return;
+	}
+}
+
+void FTPClient::handleGet(std::string fileName)
+{
+	try
+	{
+		std::filesystem::path fName(fileName);
+		if (std::filesystem::exists(fName))
+		{
+			puts("ÎÄ¼şÒÑ´æÔÚ");
+		}
+		else
+		{
+			send(clntSock, buffer, strlen(buffer) + 1, 0);
+			readFile(fileName);
+		}
+	}
+	catch (std::exception e)
+	{
+		puts(e.what());
+		return;
+	}
+}
