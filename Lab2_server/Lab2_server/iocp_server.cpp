@@ -1,3 +1,12 @@
+/*
+* @File: iocp_server.cpp
+* @Author: Xuanchen Li
+* @Email: lixc5520@mails.jlu.edu.cn
+* @Date: 2023/5/27 下午 7:00
+* @Description: 定义了IOCP回声服务端所需的各种结构和运行逻辑，
+*				服务器不断接收客户端消息并将其返回。
+* Version V1.0
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <process.h>

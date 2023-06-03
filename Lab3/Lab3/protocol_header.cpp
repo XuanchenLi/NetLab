@@ -1,5 +1,5 @@
 /*
-* @File: protocol_header.h
+* @File: protocol_header.cpp
 * @Author: Xuanchen Li
 * @Email: lixc5520@mails.jlu.edu.cn
 * @Date: 2023/5/26 下午 8:01
@@ -21,12 +21,12 @@ std::ostream& operator<<(std::ostream& os, const IPHeader& ipHdr)
 	os << "Header Length: " << ipHdr.ihl * 4 << " bytes\n";
 	os << "Total Length: " << ipHdr.tot_len << " bytes\n";
 	os << "Identification: " << ipHdr.id << std::endl;
-	os << "Flags: " << "0x" << std::hex << (ipHdr.flag_off >> 13) << std::dec << std::endl;
-	os << "Fragment offset: " << (ipHdr.flag_off & 0x1FFF) * 8 << " bytes\n";
+	os << "Flags: " << "0x" << std::hex << (ipHdr.flag_off >> 13) << std::dec << std::endl;	/*取高3位*/
+	os << "Fragment offset: " << (ipHdr.flag_off & 0x1FFF) * 8 << " bytes\n";				/*取低13位*/
 	os << "Time to live: " << ipHdr.ttl * 1<< std::endl;
 	os << "Protocol: " << ipHdr.protocol * 1<< std::endl;
 	os << "Checksum: " << "0x" << std::hex << ipHdr.checksum << std::dec << std::endl;
-	os << "Source: " << inet_ntoa(*((in_addr*)&ipHdr.saddr)) << std::endl;
+	os << "Source: " << inet_ntoa(*((in_addr*)&ipHdr.saddr)) << std::endl;					/*网络序转主机序*/
 	os << "Destination: " << inet_ntoa(*((in_addr*)&ipHdr.saddr)) << std::endl;
 	return os;
 }

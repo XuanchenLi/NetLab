@@ -1,3 +1,11 @@
+/*
+* @File: echo_client.cpp
+* @Author: Xuanchen Li
+* @Email: lixc5520@mails.jlu.edu.cn
+* @Date: 2023/5/27 下午 8:00
+* @Description: 定义了客户端运行逻辑
+* Version V1.0
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <process.h>
