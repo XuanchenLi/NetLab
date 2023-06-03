@@ -10,31 +10,50 @@
 
 #define BUF_SIZE 1024
 
+/*
+* @brief	区分异步读和异步写操作
+*/
 enum class RW_MODE
 {
 	READ,
 	WRITE
 };
 
+/**
+* @brief	封装客户端句柄信息
+*/
 typedef struct
 {
-	SOCKET clntSock;
-	SOCKADDR_IN clntAddr;
+	SOCKET clntSock;		/*客户端套接字*/
+	SOCKADDR_IN clntAddr;	/*客户端地址*/
 } ClntHandleData;
 
+/**
+* @brief	封装IO包数据
+*/
 typedef struct
 {
-	OVERLAPPED overlapped;
-	WSABUF wsaBuf;
-	char buffer[BUF_SIZE];
-	RW_MODE rwMode;
+	OVERLAPPED overlapped;		/*重叠IO所需对象*/
+	WSABUF wsaBuf;				/*重叠IO缓冲区对象*/
+	char buffer[BUF_SIZE];		/*缓冲区*/
+	RW_MODE rwMode;				/*读写模式*/
 } IOData;
 
+/**
+* @brief	IOCP工作线程主函数
+* @param	comPort		重叠端口对象
+* 
+* @return	DWORD32
+*/
 DWORD32 WINAPI EchoThreadMain(LPVOID comPort);
 
 
+/**
+* @brief 主函数
+*/
 int main(int argc, char* argv[])
 {
+	/*初始化WSA*/
 	WSADATA wsaData;
 	SYSTEM_INFO sysInfo;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
@@ -42,27 +61,31 @@ int main(int argc, char* argv[])
 		std::cerr << "初始化WSA失败。\n";
 		return 1;
 	}
-
+	/*创建完成端口对象*/
 	HANDLE hComPort;
 	hComPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
+	/*获取系统信息，创建CPU核数个工作线程*/
 	GetSystemInfo(&sysInfo);
 	for (int i = 0; i < sysInfo.dwNumberOfProcessors; ++i)
 	{
 		_beginthreadex(NULL, 0, EchoThreadMain, (LPVOID)hComPort, 0, NULL);
 	}
-
+	/*创建重叠套接字*/
 	SOCKET hServSock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	SOCKADDR_IN servAddr;
 	memset(&servAddr, 0, sizeof(servAddr));
 	servAddr.sin_family = AF_INET;
 	servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servAddr.sin_port = htons(8888);
-
+	/*绑定套接字*/
 	bind(hServSock, (SOCKADDR*)&servAddr, sizeof(servAddr));
 	listen(hServSock, 5);
 	int recvBytes, flags = 0;
+
+	/*循环接收客户端连接*/
 	while (true)
 	{	
+		/*初始化客户端句柄结构对象*/
 		SOCKADDR_IN clntAddr;
 		int addrLen = sizeof(clntAddr);
 		SOCKET hClntSock = accept(hServSock, (SOCKADDR*)&clntAddr, &addrLen);
@@ -70,8 +93,10 @@ int main(int argc, char* argv[])
 		handleInfo->clntSock = hClntSock;
 		memcpy(&(handleInfo->clntAddr), &clntAddr, addrLen);
 
+		/*将客户端套接字与完成端口绑定*/
 		CreateIoCompletionPort((HANDLE)hClntSock, hComPort, (DWORD)handleInfo, 0);
 
+		/*创建IO包对象，设置读写模式为READ，接收来自客户端的消息*/
 		IOData* ioInfo = (IOData*)malloc(sizeof(IOData));
 		memset(&(ioInfo->overlapped), 0, sizeof(OVERLAPPED));
 		ioInfo->wsaBuf.len = BUF_SIZE;
@@ -85,27 +110,39 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
+/**
+* @brief	IOCP工作线程主函数
+* @param	comPort		重叠端口对象
+*
+* @return	DWORD32
+*/
 DWORD32 WINAPI EchoThreadMain(LPVOID comPort_)
 {
+	/*参数为完成端口对象，进行类型转换*/
 	HANDLE hComPort = (HANDLE)comPort_;
-	IOData* ioInfo;
-	ClntHandleData* handleInfo;
+	IOData* ioInfo;				/*IO数据对象指针*/
+	ClntHandleData* handleInfo;	/*客户端句柄对象指针*/
 	DWORD bytesTrans;
 	DWORD flags = 0;
-	
+
+	/*工作线程循环处理IO完成消息*/
 	while (true)
 	{
+		/*等待并获取已完成的IO消息，如果没有则阻塞*/
 		GetQueuedCompletionStatus(hComPort, &bytesTrans, (PULONG_PTR)&handleInfo, (LPOVERLAPPED*)&ioInfo, INFINITE);
+		/*获取客户端套接字*/
 		SOCKET clntSock = handleInfo->clntSock;
 		if (ioInfo->rwMode == RW_MODE::READ)
 		{
-			if (bytesTrans == 0)
+			//	处理完成的读操作
+			if (bytesTrans == 0)	//	客户端断开连接，释放资源
 			{
 				closesocket(clntSock);
 				free(ioInfo);
 				free(handleInfo);
 				continue;
 			}
+			/*初始化IO数据对象用户写操作*/
 			memset(&(ioInfo->overlapped), 0, sizeof(OVERLAPPED));
 			ioInfo->wsaBuf.len = bytesTrans;
 			ioInfo->rwMode = RW_MODE::WRITE;
@@ -113,6 +150,7 @@ DWORD32 WINAPI EchoThreadMain(LPVOID comPort_)
 			printf("收到客户端[%s:%d]的信息：%s", inet_ntoa(*((in_addr*)&(handleInfo->clntAddr.sin_addr))), ntohs(handleInfo->clntAddr.sin_port), ioInfo->wsaBuf.buf);
 			WSASend(clntSock, &(ioInfo->wsaBuf), 1, NULL, 0, &(ioInfo->overlapped), NULL);
 			
+			/*新建一个IO数据对象用于下一次读操作*/
 			ioInfo = (IOData*)malloc(sizeof(IOData));
 			memset(&(ioInfo->overlapped), 0, sizeof(OVERLAPPED));
 			ioInfo->wsaBuf.len = BUF_SIZE;
@@ -122,6 +160,7 @@ DWORD32 WINAPI EchoThreadMain(LPVOID comPort_)
 		}
 		else
 		{
+			//	处理完成的写操作
 			free(ioInfo);
 		}
 	}

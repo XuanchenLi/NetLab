@@ -9,18 +9,19 @@
 
 #define BUF_SIZE 1024
 
+/*缓冲区*/
 char message[BUF_SIZE];
 
 int main(int argc, char* argv[])
 {
-
+	/*初始化WSA*/
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 	{
 		std::cerr << "初始化WSA失败。\n";
 		return 1;
 	}
-
+	/*初始化套接字*/
 	SOCKET sock = socket(PF_INET, SOCK_STREAM, 0);
 	if (sock == INVALID_SOCKET)
 	{
@@ -34,12 +35,13 @@ int main(int argc, char* argv[])
 	servAddr.sin_family = AF_INET;
 	servAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	servAddr.sin_port = htons(8888);
-
+	/*连接服务器*/
 	if (connect(sock, (SOCKADDR*)&servAddr, sizeof(servAddr)) == -1) {
 		std::cerr << "连接服务器失败。\n";
 		WSACleanup();
 		return 1;
 	}
+	/*循环发送、接收消息*/
 	while (true)
 	{
 		fputs("输入信息：", stdout);
