@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
+#include <ctime>
 #include <WinSock2.h>
 #include <Windows.h>
 #include <process.h>
@@ -18,11 +20,12 @@ FTPServer::FTPServer(std::string pDic, u_short pPort) : dic(pDic)
 {
 	WSADATA wsaData;
 	SYSTEM_INFO sysInfo;
+	puts("初始化WSA...");
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 	{
 		throw std::runtime_error("初始化WSA失败");
 	}
-
+	puts("创建完成端口...");
 	hComPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 	if (hComPort == NULL)
 	{
@@ -30,6 +33,7 @@ FTPServer::FTPServer(std::string pDic, u_short pPort) : dic(pDic)
 	}
 	GetSystemInfo(&sysInfo);
 	HANDLE wtHandle;
+	puts("创建工作线程...");
 	for (int i = 0; i < sysInfo.dwNumberOfProcessors; ++i)
 	{
 		wtHandle = (HANDLE)_beginthreadex(NULL, 0, FTPServer::ftpThreadMain, (LPVOID)this, 0, NULL);
@@ -39,25 +43,26 @@ FTPServer::FTPServer(std::string pDic, u_short pPort) : dic(pDic)
 		}
 		workerHandles.push_back(wtHandle);
 	}
-
+	puts("创建套接字...");
 	hServerSock = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	if (hServerSock == INVALID_SOCKET)
 	{
-		throw std::runtime_error("创建WSA套接字失败:"+WSAGetLastError());
+		throw std::runtime_error("创建WSA套接字失败:" + WSAGetLastError());
 	}
 	servAddr;
 	memset(&servAddr, 0, sizeof(servAddr));
 	servAddr.sin_family = AF_INET;
 	servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servAddr.sin_port = htons(pPort);
-
+	puts("绑定套接字...");
 	if (bind(hServerSock, (SOCKADDR*)&servAddr, sizeof(servAddr)))
 	{
 		throw std::runtime_error("绑定套接字失败" + WSAGetLastError());
 	}
+	puts("开始监听...");
 	listen(hServerSock, 5);
 	int recvBytes, flags = 0;
-
+	puts("FTP服务器启动成功");
 	while (true)
 	{
 		SOCKADDR_IN clntAddr;
@@ -67,7 +72,7 @@ FTPServer::FTPServer(std::string pDic, u_short pPort) : dic(pDic)
 		ClntHandleData* handleInfo = (ClntHandleData*)malloc(sizeof(ClntHandleData));
 		handleInfo->clntSock = hClntSock;
 		memcpy(&(handleInfo->clntAddr), &clntAddr, addrLen);
-
+		printf("客户端[%s:%d]连接成功\n", inet_ntoa(*((in_addr*)&(handleInfo->clntAddr.sin_addr))), ntohs(handleInfo->clntAddr.sin_port));
 		CreateIoCompletionPort((HANDLE)hClntSock, hComPort, (DWORD)handleInfo, 0);
 
 		IOData* ioInfo = (IOData*)malloc(sizeof(IOData));
@@ -108,7 +113,7 @@ FTPServer::~FTPServer()
 
 void FTPServer::handleList(ClntHandleData* cHandleData, IOData* ioData, std::string dic)
 {
-	auto fileNameList = getFileNameList(dic);
+	auto fileNameList = getFileInfoList(dic);
 	//puts(dic.c_str());
 	transList(fileNameList, *cHandleData);
 
@@ -124,6 +129,7 @@ void FTPServer::handleQuit(ClntHandleData* cHandleData, IOData* ioData, std::uno
 	free(ioData);
 	clntSocks.erase(cHandleData->clntSock);
 	closesocket(cHandleData->clntSock);
+	printf("客户端[%s:%d]断开连接\n", inet_ntoa(*((in_addr*)&(cHandleData->clntAddr.sin_addr))), ntohs(cHandleData->clntAddr.sin_port));
 }
 
 void FTPServer::handleUnknown(ClntHandleData* cHandleData, IOData* ioData)
@@ -140,9 +146,9 @@ void FTPServer::handleUnknown(ClntHandleData* cHandleData, IOData* ioData)
 	WSARecv(cHandleData->clntSock, &(ioData->wsaBuf), 1, NULL, (LPDWORD)&flags, &(ioData->overlapped), NULL);
 }
 
-std::vector<std::string> FTPServer::getFileNameList(std::string dic)
+std::vector<_finddata_t> FTPServer::getFileInfoList(std::string dic)
 {
-	std::vector<std::string> res;
+	std::vector<_finddata_t> res;
 	long hFile = 0;
 	struct _finddata_t fileinfo;
 	std::string p;
@@ -153,7 +159,7 @@ std::vector<std::string> FTPServer::getFileNameList(std::string dic)
 			//std::cout << fileinfo.name;
 			if (!(fileinfo.attrib & _A_SUBDIR))
 			{
-				res.push_back(fileinfo.name);
+				res.push_back(fileinfo);
 			}
 		} while (_findnext(hFile, &fileinfo) == 0);
 		_findclose(hFile);
@@ -308,7 +314,7 @@ void FTPServer::transFile(std::string fName, const ClntHandleData& cHandle)
 
 void FTPServer::readFile(std::string fName, const ClntHandleData& cHandle)
 {
-	std::ofstream file(fName);
+	std::ofstream file(fName, std::ios::binary);
 	IOData* recvData = getNewBlock(RW_MODE::READ);
 	bool firstPack = true;
 	long long totalLen = 0;
@@ -337,17 +343,22 @@ void FTPServer::readFile(std::string fName, const ClntHandleData& cHandle)
 	file.close();
 }
 
-void FTPServer::transList(const std::vector<std::string>& list, const ClntHandleData& cHandle)
+void FTPServer::transList(const std::vector<_finddata_t>& list, const ClntHandleData& cHandle)
 {
-	std::string msg = "";
-	int cnt = 0;
-	for (auto name : list)
+	std::ostringstream oss;
+	oss << std::setw(30) << std::setfill(' ') << std::left << "name"
+		<< std::setw(30) << std::setfill(' ') << std::left << "size"
+		<< std::setw(30) << std::setfill(' ') << std::left << "modified time" << std::endl;
+	for (const auto& info : list)
 	{
-
-		msg.append(name);
-		msg.append((cnt % 5 || cnt == 0) ? " " : "\n");
-		cnt++;
+		std::tm* tm = std::localtime(&info.time_access);
+		std::ostringstream oss_t;
+		oss_t << std::put_time(tm, "%Y-%m-%d %H:%M:%S");
+		oss << std::setw(30) << std::setfill(' ') << std::left << info.name
+			<< std::setw(30) << std::setfill(' ') << std::left << std::to_string(info.size) + " B"
+			<< std::setw(30) << std::setfill(' ') << std::left << oss_t.str() << std::endl;
 	}
+	std::string msg = oss.str();
 	msg = std::to_string(msg.length())+ " " + msg;
 	for (int i = 0; i < int(ceil(msg.length() / (BUF_SIZE * 1.0))); ++i)
 	{
@@ -405,18 +416,11 @@ void FTPServer::handlePut(ClntHandleData* cHandle, IOData* ioData, std::string f
 	try
 	{
 		std::filesystem::path fName(fileName);
-		if (std::filesystem::exists(fName))
-		{
-			transPrompt(cHandle, std::string("文件已存在"));
-		}
-		else
-		{
-			readFile(fileName, *cHandle);
-		}
+		readFile(fileName, *cHandle);
 	}
 	catch (std::exception e)
 	{
-		transPrompt(cHandle, std::string(e.what()));
+		puts(e.what());
 	}
 	DWORD flags = 0;
 	memset(&(ioData->overlapped), 0, sizeof(OVERLAPPED));

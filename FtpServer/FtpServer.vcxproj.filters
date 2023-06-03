@@ -30,4 +30,9 @@
   <ItemGroup>
     <Text Include="home\file1.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="home\pic.jpg">
+      <Filter>资源文件</Filter>
+    </Image>
+  </ItemGroup>
 </Project>

@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
+#include <io.h>
+#include <filesystem>
 #include <WinSock2.h>
 
 #define BUF_SIZE 4096
@@ -47,7 +49,7 @@ private:
 	static DWORD32 WINAPI ftpThreadMain(LPVOID);
 	static void transFile(std::string fName, const ClntHandleData&);
 	static void readFile(std::string fName, const ClntHandleData&);
-	static void transList(const std::vector<std::string>&, const ClntHandleData&);
+	static void transList(const std::vector<_finddata_t>&, const ClntHandleData&);
 	static void transPrompt(ClntHandleData*, std::string);
 	static IOData* getNewBlock(RW_MODE);
 	static void handleGet(ClntHandleData*, IOData*, std::string filePath);
@@ -55,7 +57,7 @@ private:
 	static void handleList(ClntHandleData*, IOData*, std::string);
 	static void handleQuit(ClntHandleData*, IOData*, std::unordered_set<SOCKET>&);
 	static void handleUnknown(ClntHandleData*, IOData*);
-	static std::vector<std::string> getFileNameList(std::string);
+	static std::vector<_finddata_t> getFileInfoList(std::string);
 	static bool isFileAvailable(std::string);
 
 	std::string dic;

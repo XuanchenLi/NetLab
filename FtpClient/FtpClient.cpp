@@ -22,11 +22,12 @@ FTPClient::FTPClient(std::string dir, std::string servIP, u_short servPort)
 	servAddr.sin_addr.s_addr = inet_addr(servIP.c_str());
 	servAddr.sin_port = htons(servPort);
 	WSADATA wsaData;
+	puts("初始化WSA...");
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 	{
 		throw std::exception("初始化WSA失败");
 	}
-
+	puts("创建套接字...");
 	clntSock = socket(PF_INET, SOCK_STREAM, 0);
 	if (clntSock == INVALID_SOCKET)
 	{
@@ -38,12 +39,12 @@ FTPClient::FTPClient(std::string dir, std::string servIP, u_short servPort)
 	{
 		throw std::exception("关闭Nagle算法失败");
 	}
-
+	puts("连接服务器...");
 	if (connect(clntSock, (SOCKADDR*)&servAddr, sizeof(servAddr)) == -1)
 	{
 		throw std::exception("连接服务器失败");
 	}
-
+	puts("连接FTP服务器成功");
 	while (true)
 	{
 		printf("FTPClient>");
@@ -63,6 +64,7 @@ FTPClient::FTPClient(std::string dir, std::string servIP, u_short servPort)
 			break;
 		case::FTP_COMMAND::QUIT:
 			handleQuit();
+			return;
 			break;
 		case::FTP_COMMAND::UNKNOWN:
 			handleUnknown();
@@ -138,7 +140,7 @@ void FTPClient::transFile(std::string fName)
 
 void FTPClient::readFile(std::string fName)
 {
-	std::ofstream file(fName);
+	std::ofstream file(fName, std::ios::binary);
 	bool firstPack = true;
 	long long totalLen = 0;
 	int pos = 0;
@@ -150,6 +152,13 @@ void FTPClient::readFile(std::string fName)
 		{
 			while (pos < recvBytes && buffer[pos] != ' ') pos++;
 			pos++;
+			if (!(buffer[0] >= '0' && buffer[0] <= '9'))
+			{
+				puts(buffer);
+				file.close();
+				remove(fName.c_str());
+				return;
+			}
 			totalLen = atoll(buffer);
 			firstPack = false;
 		}
