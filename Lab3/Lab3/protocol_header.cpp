@@ -8,6 +8,13 @@
 */
 #include "protocol_header.h"
 
+/*
+* @brief	格式化输出IP头
+* @param	os		输出流对象引用
+* @param	ipHdr	IP头结构
+* 
+* @return	输出流对象
+*/
 std::ostream& operator<<(std::ostream& os, const IPHeader& ipHdr)
 {
 	os << "Version: " << ipHdr.version * 1 << std::endl;
@@ -24,6 +31,13 @@ std::ostream& operator<<(std::ostream& os, const IPHeader& ipHdr)
 	return os;
 }
 
+/*
+* @brief	格式化输出TCP头
+* @param	os		输出流对象引用
+* @param	tcpHdr	TCP头结构
+*
+* @return	输出流对象
+*/
 std::ostream& operator<<(std::ostream& os, const TCPHeader& tcpHdr)
 {
 	os << "Source port: " << ntohs(tcpHdr.sport) << std::endl;
