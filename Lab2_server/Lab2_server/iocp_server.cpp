@@ -143,8 +143,10 @@ DWORD32 WINAPI EchoThreadMain(LPVOID comPort_)
 		SOCKET clntSock = handleInfo->clntSock;
 		if (ioInfo->rwMode == RW_MODE::READ)
 		{
+			ioInfo->wsaBuf.len = bytesTrans;
+			ioInfo->wsaBuf.buf[ioInfo->wsaBuf.len] = '\0';
 			//	处理完成的读操作
-			if (bytesTrans == 0)	//	客户端断开连接，释放资源
+			if (bytesTrans == 0 || std::string(ioInfo->wsaBuf.buf) == "quit\n")	//	客户端断开连接，释放资源
 			{
 				closesocket(clntSock);
 				free(ioInfo);
@@ -153,9 +155,7 @@ DWORD32 WINAPI EchoThreadMain(LPVOID comPort_)
 			}
 			/*初始化IO数据对象用户写操作*/
 			memset(&(ioInfo->overlapped), 0, sizeof(OVERLAPPED));
-			ioInfo->wsaBuf.len = bytesTrans;
 			ioInfo->rwMode = RW_MODE::WRITE;
-			ioInfo->wsaBuf.buf[ioInfo->wsaBuf.len] = '\0';
 			printf("收到客户端[%s:%d]的信息：%s", inet_ntoa(*((in_addr*)&(handleInfo->clntAddr.sin_addr))), ntohs(handleInfo->clntAddr.sin_port), ioInfo->wsaBuf.buf);
 			WSASend(clntSock, &(ioInfo->wsaBuf), 1, NULL, 0, &(ioInfo->overlapped), NULL);
 			

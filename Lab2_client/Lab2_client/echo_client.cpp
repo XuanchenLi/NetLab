@@ -54,6 +54,11 @@ int main(int argc, char* argv[])
 	{
 		fputs(" ‰»Î–≈œ¢£∫", stdout);
 		fgets(message, BUF_SIZE, stdin);
+		if (std::string(message) == "quit\n")
+		{
+			printf("12312");
+			break;
+		}
 		send(sock, message, strlen(message), 0);
 		int recvLen = recv(sock, message, BUF_SIZE - 1, 0);
 		message[recvLen] = '\0';
